@@ -2,7 +2,9 @@
 """Simple test to verify player agent responds correctly to JSON-RPC calls."""
 import sys
 import os
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'src'))
+
+# Add src directory to path (go up 2 levels from tests/manual/)
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'src'))
 
 import subprocess
 import time
@@ -16,8 +18,13 @@ def main():
     
     # Start agent
     print("\n1. Starting player agent on port 8001...")
+    
+    # Get project root (2 levels up from tests/manual/)
+    project_root = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..')
+    src_path = os.path.join(project_root, 'src')
+    
     env = os.environ.copy()
-    env['PYTHONPATH'] = 'src'
+    env['PYTHONPATH'] = src_path
     
     agent_proc = subprocess.Popen(
         [sys.executable, "-m", "agents.player", 
@@ -26,7 +33,8 @@ def main():
          "--league-url", "http://127.0.0.1:9000"],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-        env=env
+        env=env,
+        cwd=project_root
     )
     
     # Wait for startup
@@ -166,7 +174,9 @@ def main():
     print("=" * 60)
     print("\nThe player agent is working correctly!")
     print("You can now run the full league with:")
-    print("  PYTHONPATH=src python3 -m agents.league_manager")
+    print("  python3 scripts/run_league.py")
+    print("Or start individual agents with:")
+    print("  python3 scripts/start_player.py --port 8001 --display-name Agent1 --league-url http://127.0.0.1:9000")
     print("=" * 60)
     
     return 0

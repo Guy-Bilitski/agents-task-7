@@ -1,0 +1,30 @@
+Files Organized - Summary
+========================
+
+STRUCTURE:
+✓ docs/              - All documentation moved here
+✓ scripts/           - All executable scripts moved here  
+✓ tests/manual/      - Manual test scripts moved here
+✓ src/               - Source code (unchanged)
+
+CHANGES:
+- Moved RUNNING_AGENTS.md → docs/
+- Moved MANUAL_TESTING_GUIDE.md → docs/
+- Moved PROJECT_STRUCTURE.md → docs/
+- Moved validation-checklist.md → docs/
+- Moved test_player_manual.py → tests/manual/
+- Moved start_player.py → scripts/
+- Moved start_league_manager.py → scripts/
+- Moved run_league.py → scripts/
+- Updated all paths in documentation
+- Updated README.md with new structure
+
+VERIFICATION:
+✓ Manual test works from new location
+✓ All paths in docs updated
+✓ Scripts work from new location
+✓ System fully operational
+
+REMOVED:
+✗ IMPORT_FIXES_SUMMARY.md (removed - internal docs)
+✗ STATUS.md (removed - internal docs)

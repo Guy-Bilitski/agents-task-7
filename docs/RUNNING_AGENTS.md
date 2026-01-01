@@ -4,30 +4,30 @@
 
 ### Verify Everything Works
 ```bash
-python3 test_player_manual.py
+python3 tests/manual/test_player_manual.py
 ```
 
 ### Start a Player Agent
 
 ```bash
-python3 start_player.py --port 8001 --display-name "Agent1" --league-url http://127.0.0.1:9000
+python3 scripts/start_player.py --port 8001 --display-name "Agent1" --league-url http://127.0.0.1:9000
 ```
 
 ### Start Multiple Agents (in separate terminals)
 
 **Terminal 1:**
 ```bash
-python3 start_player.py --port 8001 --display-name "Alpha" --league-url http://127.0.0.1:9000
+python3 scripts/start_player.py --port 8001 --display-name "Alpha" --league-url http://127.0.0.1:9000
 ```
 
 **Terminal 2:**
 ```bash
-python3 start_player.py --port 8002 --display-name "Beta" --league-url http://127.0.0.1:9000
+python3 scripts/start_player.py --port 8002 --display-name "Beta" --league-url http://127.0.0.1:9000
 ```
 
 **Terminal 3:**
 ```bash
-python3 start_player.py --port 8003 --display-name "Gamma" --league-url http://127.0.0.1:9000
+python3 scripts/start_player.py --port 8003 --display-name "Gamma" --league-url http://127.0.0.1:9000
 ```
 
 ## Testing Agents with curl
@@ -86,7 +86,7 @@ curl -X POST http://127.0.0.1:8001/mcp \
 ## Agent Options
 
 ```bash
-python3 start_player.py \
+python3 scripts/start_player.py \
   --port <PORT> \
   --display-name <NAME> \
   --league-url <URL> \
