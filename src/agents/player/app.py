@@ -5,7 +5,7 @@ Provides:
 - GET /health: Health check endpoint
 """
 import logging
-from typing import Any, Optional
+from typing import Any, Optional, cast
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, Response
@@ -18,6 +18,7 @@ from agent.jsonrpc import (
     method_not_found_error,
     internal_error,
     JSONRPCError,
+    JSONRPCRequest,
 )
 from agent.registration import init_registration, stop_registration
 
@@ -82,7 +83,7 @@ def create_app(config: Optional[Any] = None) -> FastAPI:
         
         Accepts JSON-RPC 2.0 requests and dispatches to appropriate handlers.
         """
-        request_id = None
+        request_id: Optional[int | str] = None
         
         try:
             # Read raw body
@@ -92,22 +93,29 @@ def create_app(config: Optional[Any] = None) -> FastAPI:
             rpc_request, error = parse_request(body)
             
             # If parsing failed, return error
-            if error:
-                response = create_error_response(None, error)
-                logger.warning(f"Invalid JSON-RPC request: {error.message}")
+            if error is not None or rpc_request is None:
+                err = error if error is not None else internal_error(ValueError("Parse failed"))
+                response = create_error_response(None, err)
+                logger.warning(f"Invalid JSON-RPC request: {err.message}")
                 return JSONResponse(content=response)
             
-            # Extract request ID for logging and responses
-            request_id = rpc_request.id
-            logger.info(f"JSON-RPC request: method={rpc_request.method}, id={request_id}")
+            # Cast to ensure type checker knows it's not None
+            req: JSONRPCRequest = rpc_request
+            
+            # Extract fields for easier access
+            request_id = req.id
+            method = req.method
+            params = req.params
+            
+            logger.info(f"JSON-RPC request: method={method}, id={request_id}")
             
             # Check if this is a notification (no response needed)
-            if rpc_request.is_notification:
-                logger.info(f"Notification received (no response): method={rpc_request.method}")
+            if req.is_notification:
+                logger.info(f"Notification received (no response): method={method}")
                 # Still process the method, just don't respond
                 try:
                     from agent.tools import dispatch_method
-                    dispatch_method(rpc_request.method, rpc_request.params)
+                    dispatch_method(method, params)
                 except Exception as e:
                     logger.error(f"Error processing notification: {e}", exc_info=True)
                 return Response(status_code=204)  # No content
@@ -115,16 +123,16 @@ def create_app(config: Optional[Any] = None) -> FastAPI:
             # Dispatch to method handler
             try:
                 from agent.tools import dispatch_method
-                result = dispatch_method(rpc_request.method, rpc_request.params)
+                result = dispatch_method(method, params)
                 response = create_success_response(request_id, result)
-                logger.info(f"Method '{rpc_request.method}' succeeded")
+                logger.info(f"Method '{method}' succeeded")
                 return JSONResponse(content=response)
             
-            except KeyError as e:
+            except KeyError:
                 # Method not found
-                error = method_not_found_error(rpc_request.method)
-                response = create_error_response(request_id, error)
-                logger.warning(f"Method not found: {rpc_request.method}")
+                err = method_not_found_error(method)
+                response = create_error_response(request_id, err)
+                logger.warning(f"Method not found: {method}")
                 return JSONResponse(content=response)
             
             except JSONRPCError as e:
@@ -136,8 +144,8 @@ def create_app(config: Optional[Any] = None) -> FastAPI:
         except Exception as e:
             # Catch any unexpected errors
             logger.error(f"Unexpected error in MCP endpoint: {e}", exc_info=True)
-            error = internal_error(e)
-            response = create_error_response(request_id, error)
+            err = internal_error(e)
+            response = create_error_response(request_id, err)
             return JSONResponse(content=response, status_code=500)
     
     return app

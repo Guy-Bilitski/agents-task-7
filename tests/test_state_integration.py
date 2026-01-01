@@ -1,12 +1,26 @@
 """Integration test for state management.
 
 Tests that state is properly initialized, thread-safe, and deterministic.
+
+This test requires a running agent server on port 8001.
+Run: python -m agent --port 8001 --display-name TestAgent
 """
+import pytest
 import requests
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
+def server_is_running():
+    """Check if the agent server is running."""
+    try:
+        resp = requests.get("http://127.0.0.1:8001/health", timeout=1)
+        return resp.status_code == 200
+    except:
+        return False
+
+
+@pytest.mark.skipif(not server_is_running(), reason="Agent server not running on port 8001")
 def test_state_management():
     """Test full state management lifecycle."""
     base_url = "http://127.0.0.1:8001"

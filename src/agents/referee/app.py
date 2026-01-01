@@ -1,0 +1,1 @@
+# optional MCP server: ping + health
