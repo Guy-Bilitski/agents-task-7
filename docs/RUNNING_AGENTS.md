@@ -2,18 +2,54 @@
 
 ## Quick Start
 
-### Verify Everything Works
-```bash
-python3 tests/manual/test_player_manual.py
-```
+### Option 1: Run the Complete League System
 
-### Start a Player Agent
+The easiest way to run everything:
 
 ```bash
-python3 scripts/start_player.py --port 8001 --display-name "Agent1" --league-url http://127.0.0.1:9000
+python3 scripts/run_league.py
 ```
 
-### Start Multiple Agents (in separate terminals)
+This automatically:
+- Starts the League Manager on port 9000
+- Spawns 4 player agents (ports 8101-8104)
+- Runs matches and displays standings
+
+**With options:**
+```bash
+python3 scripts/run_league.py --num-agents 6    # 6 agents
+python3 scripts/run_league.py --rounds 5        # 5 rounds per match
+python3 scripts/run_league.py --log-level DEBUG # Verbose logging
+```
+
+### Option 2: Run Components Separately
+
+#### Step 1: Start the League Manager
+
+```bash
+python3 scripts/start_league_manager.py
+```
+
+**Or with custom port:**
+```bash
+python3 scripts/start_league_manager.py --port 9000
+```
+
+**Verify it's running:**
+```bash
+curl http://127.0.0.1:9000/health
+# Expected: {"ok":true}
+```
+
+The League Manager provides:
+- Agent registration endpoint
+- Match scheduling and execution (referee functionality)
+- Standings tracking
+- REST API at `/health`, `/agents`, `/standings`
+
+#### Step 2: Start Player Agents
+
+Now start your player agents in separate terminals:
 
 **Terminal 1:**
 ```bash
@@ -28,6 +64,29 @@ python3 scripts/start_player.py --port 8002 --display-name "Beta" --league-url h
 **Terminal 3:**
 ```bash
 python3 scripts/start_player.py --port 8003 --display-name "Gamma" --league-url http://127.0.0.1:9000
+```
+
+**Terminal 4:**
+```bash
+python3 scripts/start_player.py --port 8004 --display-name "Delta" --league-url http://127.0.0.1:9000
+```
+
+**Check registered agents:**
+```bash
+curl http://127.0.0.1:9000/agents
+```
+
+### Option 3: Test a Single Player Agent
+
+For development and testing without the League Manager:
+
+```bash
+python3 tests/manual/test_player_manual.py
+```
+
+Or start a single agent manually:
+```bash
+python3 scripts/start_player.py --port 8001 --display-name "Agent1" --league-url http://127.0.0.1:9000
 ```
 
 ## Testing Agents with curl
