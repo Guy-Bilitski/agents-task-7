@@ -33,8 +33,8 @@ class TestHandleGameInvitation:
         
         # Verify state was updated
         state = get_state()
-        assert state._last_invitation is not None
-        assert state._last_invitation.game_id == "game123"
+        assert "game123" in state.invitations
+        assert state.invitations["game123"].game_id == "game123"
     
     def test_invitation_with_extra_fields(self):
         """Test invitation accepts extra fields."""
@@ -53,7 +53,7 @@ class TestHandleGameInvitation:
         
         # Extra fields should be stored in state
         state = get_state()
-        assert state._last_invitation.extra_fields["extra_field"] == "should_be_accepted"
+        assert state.invitations["game456"].extra_fields["extra_field"] == "should_be_accepted"
     
     def test_invitation_without_params(self):
         """Test invitation without params raises error."""
@@ -85,8 +85,8 @@ class TestParityChoose:
         
         # Verify state was updated
         state = get_state()
-        assert state._current_choice is not None
-        assert state._current_choice.game_id == "game789"
+        assert "game789" in state.choices
+        assert state.choices["game789"].game_id == "game789"
     
     def test_deterministic_choice(self):
         """Test same game_id gives same choice."""
@@ -260,4 +260,5 @@ class TestNotifyMatchResult:
         
         # Extra fields should be in history
         state = get_state()
-        assert state._last_result is not None
+        assert "game888" in state.results
+        assert state.results["game888"].extra_fields["extra_metadata"] == "should_be_stored"

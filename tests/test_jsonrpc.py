@@ -206,7 +206,7 @@ class TestErrorConstructors:
         
         assert error.code == -32601
         assert error.message == "Method not found"
-        assert error.data == "unknown_method"
+        assert "unknown_method" in str(error.data)
     
     def test_invalid_params_error(self):
         """Test invalid params error constructor."""

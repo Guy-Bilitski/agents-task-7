@@ -22,34 +22,35 @@ class TestAgentState:
     
     def test_initialization(self, fresh_state):
         """Test state initializes correctly."""
-        assert fresh_state._display_name == "TestAgent"
-        assert fresh_state._last_invitation is None
-        assert fresh_state._current_choice is None
-        assert fresh_state._last_result is None
-        assert fresh_state._stats.games_played == 0
-        assert fresh_state._stats.wins == 0
-        assert fresh_state._stats.losses == 0
-        assert fresh_state._stats.draws == 0
-        assert len(fresh_state._history) == 0
+        assert fresh_state.display_name == "TestAgent"
+        assert len(fresh_state.invitations) == 0
+        assert len(fresh_state.choices) == 0
+        assert len(fresh_state.results) == 0
+        assert fresh_state.stats.games_played == 0
+        assert fresh_state.stats.wins == 0
+        assert fresh_state.stats.losses == 0
+        assert fresh_state.stats.draws == 0
+        assert len(fresh_state.history) == 0
     
     def test_record_invitation(self, fresh_state):
         """Test recording game invitation."""
         fresh_state.record_invitation(
             game_id="game123",
-            from_player="league",
             invitation_id="inv001",
+            from_player="league",
             extra_fields={"custom": "data"}
         )
         
-        assert fresh_state._last_invitation is not None
-        assert fresh_state._last_invitation.game_id == "game123"
-        assert fresh_state._last_invitation.from_player == "league"
-        assert fresh_state._last_invitation.invitation_id == "inv001"
-        assert fresh_state._last_invitation.extra_fields == {"custom": "data"}
+        assert "game123" in fresh_state.invitations
+        invitation = fresh_state.invitations["game123"]
+        assert invitation.game_id == "game123"
+        assert invitation.from_player == "league"
+        assert invitation.invitation_id == "inv001"
+        assert invitation.extra_fields == {"custom": "data"}
         
         # Check history
-        assert len(fresh_state._history) == 1
-        assert fresh_state._history[0]["event"] == "invitation"
+        assert len(fresh_state.history) == 1
+        assert fresh_state.history[0]["type"] == "invitation"
     
     def test_record_choice(self, fresh_state):
         """Test recording parity choice."""
@@ -59,13 +60,14 @@ class TestAgentState:
             extra_fields={}
         )
         
-        assert fresh_state._current_choice is not None
-        assert fresh_state._current_choice.game_id == "game456"
-        assert fresh_state._current_choice.choice == "even"
+        assert "game456" in fresh_state.choices
+        choice = fresh_state.choices["game456"]
+        assert choice.game_id == "game456"
+        assert choice.choice == "even"
         
         # Check history
-        assert len(fresh_state._history) == 1
-        assert fresh_state._history[0]["event"] == "parity_choice"
+        assert len(fresh_state.history) == 1
+        assert fresh_state.history[0]["type"] == "choice"
     
     def test_record_result_win(self, fresh_state):
         """Test recording a win."""
@@ -76,9 +78,10 @@ class TestAgentState:
             extra_fields={}
         )
         
-        assert fresh_state._last_result is not None
-        assert fresh_state._last_result.game_id == "game789"
-        assert fresh_state._last_result.winner == "TestAgent"
+        assert "game789" in fresh_state.results
+        result = fresh_state.results["game789"]
+        assert result.game_id == "game789"
+        assert result.winner == "TestAgent"
         
         stats = fresh_state.get_stats()
         assert stats.games_played == 1
@@ -120,15 +123,15 @@ class TestAgentState:
     
     def test_get_history(self, fresh_state):
         """Test getting event history."""
-        fresh_state.record_invitation("g1", "league", "inv1", {})
+        fresh_state.record_invitation("g1", "inv1", "league", {})
         fresh_state.record_choice("g1", "even", {})
         fresh_state.record_result("g1", "TestAgent", {}, {})
         
         history = fresh_state.get_history()
         assert len(history) == 3
-        assert history[0]["event"] == "invitation"
-        assert history[1]["event"] == "parity_choice"
-        assert history[2]["event"] == "match_result"
+        assert history[0]["type"] == "invitation"
+        assert history[1]["type"] == "choice"
+        assert history[2]["type"] == "result"
 
 
 class TestThreadSafety:

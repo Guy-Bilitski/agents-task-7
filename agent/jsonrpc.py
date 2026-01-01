@@ -42,6 +42,12 @@ class JSONRPCError(Exception):
     code: int
     message: str
     data: Optional[Any] = None
+    
+    def __str__(self) -> str:
+        """String representation of error."""
+        if self.data:
+            return f"JSONRPCError({self.code}): {self.message} - {self.data}"
+        return f"JSONRPCError({self.code}): {self.message}"
 
 
 def parse_request(body: bytes) -> tuple[Optional[JSONRPCRequest], Optional[JSONRPCError]]:
@@ -262,5 +268,5 @@ def internal_error(exception: Exception) -> JSONRPCError:
     return JSONRPCError(
         code=INTERNAL_ERROR,
         message="Internal error",
-        data=str(exception)
+        data=f"{type(exception).__name__}: {str(exception)}"
     )
