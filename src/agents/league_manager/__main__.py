@@ -22,13 +22,24 @@ from agents.league_manager.manager import LeagueManager
 logger = logging.getLogger(__name__)
 
 
+# Filter to suppress CancelledError during shutdown
+class SuppressCancelledErrorFilter(logging.Filter):
+    def filter(self, record):
+        if record.exc_info:
+            exc_type = record.exc_info[0]
+            if exc_type is asyncio.CancelledError:
+                return False
+        return True
+
+
 class AgentProcess:
     """Manages a single agent subprocess."""
     
-    def __init__(self, port: int, name: str, league_url: str):
+    def __init__(self, port: int, name: str, league_url: str, strategy: str = "random"):
         self.port = port
         self.name = name
         self.league_url = league_url
+        self.strategy = strategy
         self.endpoint = f"http://127.0.0.1:{port}/mcp"
         self.health_url = f"http://127.0.0.1:{port}/health"
         self.process: Optional[subprocess.Popen] = None
@@ -39,7 +50,15 @@ class AgentProcess:
             # Find Python executable
             python_exe = sys.executable
             
-            logger.info(f"Starting agent '{self.name}' on port {self.port}")
+            # Calculate src directory (go up from agents/league_manager/__main__.py to project root, then add src)
+            current_file = os.path.abspath(__file__)
+            project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(current_file))))
+            src_path = os.path.join(project_root, "src")
+            
+            logger.info(f"Starting agent '{self.name}' on port {self.port} with strategy '{self.strategy}'")
+            
+            env = os.environ.copy()
+            env["PYTHONPATH"] = src_path
             
             self.process = subprocess.Popen(
                 [
@@ -47,11 +66,12 @@ class AgentProcess:
                     "--port", str(self.port),
                     "--display-name", self.name,
                     "--league-url", self.league_url,
+                    "--strategy", self.strategy,
                     "--log-level", "WARNING",
                 ],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                env={**os.environ, "PYTHONPATH": os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "src")}
+                env=env
             )
             
             # Wait for health check (async)
@@ -63,6 +83,16 @@ class AgentProcess:
                         return True
                 except Exception:
                     await asyncio.sleep(0.5)
+            
+            # Agent failed - try to get error output
+            if self.process.poll() is not None:
+                # Process has terminated
+                stderr = self.process.stderr.read().decode() if self.process.stderr else ""
+                stdout = self.process.stdout.read().decode() if self.process.stdout else ""
+                if stderr:
+                    logger.error(f"  ✗ Agent stderr: {stderr[:200]}")
+                if stdout:
+                    logger.debug(f"  Agent stdout: {stdout[:200]}")
             
             logger.error(f"  ✗ Agent '{self.name}' failed to start")
             return False
@@ -100,33 +130,92 @@ async def run_league(config: LeagueConfig) -> int:
             # Print banner
             logger.info("")
             logger.info("█" * 60)
-            logger.info("     PARITY GAME LEAGUE - MULTI-AGENT COMPETITION")
+            if config.server_only:
+                logger.info("     LEAGUE MANAGER - SERVER ONLY MODE")
+            else:
+                logger.info("     PARITY GAME LEAGUE - MULTI-AGENT COMPETITION")
             logger.info("█" * 60)
             logger.info("")
             
             # Create league manager
-            manager = LeagueManager(port=config.port, rounds=config.rounds)
+            manager = LeagueManager(
+                port=config.port,
+                rounds=config.rounds,
+                use_external_referee=config.use_external_referee
+            )
             league_url = f"http://127.0.0.1:{config.port}"
             
             # Start league manager in background
             logger.info("Starting League Manager...")
             server_task = asyncio.create_task(manager.start_server())
             
+            # Give server a moment to detect port conflicts
+            await asyncio.sleep(0.1)
+            
+            # Check if server task has failed immediately (e.g., port conflict)
+            if server_task.done():
+                try:
+                    server_task.result()
+                except Exception as e:
+                    error_msg = str(e)
+                    logger.error(f"  ✗ {error_msg}")
+                    return 1
+            
             # Wait for league manager to be ready (async)
-            for _ in range(20):
+            server_ready = False
+            for i in range(20):
+                # Check if server task has failed during startup
+                if server_task.done():
+                    try:
+                        server_task.result()
+                    except Exception as e:
+                        logger.error(f"  ✗ League Manager failed to start: {e}")
+                        return 1
+                
                 try:
                     resp = await client.get(f"{league_url}/health", timeout=0.5)
                     if resp.status_code == 200:
                         logger.info(f"  ✓ League Manager ready on port {config.port}")
+                        server_ready = True
                         break
                 except Exception:
                     await asyncio.sleep(0.25)
-            else:
-                logger.error("  ✗ League Manager failed to start")
+            
+            if not server_ready:
+                logger.error("  ✗ League Manager failed to start (timeout)")
                 return 1
             
-            # Agent names
+            # If server-only mode, just run the server and wait
+            if config.server_only:
+                logger.info("")
+                logger.info("=" * 60)
+                logger.info("SERVER RUNNING IN SERVER-ONLY MODE")
+                logger.info("=" * 60)
+                logger.info("")
+                logger.info("Endpoints:")
+                logger.info(f"  Health:   http://127.0.0.1:{config.port}/health")
+                logger.info(f"  Register: http://127.0.0.1:{config.port}/register")
+                logger.info(f"  Agents:   http://127.0.0.1:{config.port}/agents")
+                logger.info(f"  Standings: http://127.0.0.1:{config.port}/standings")
+                logger.info("")
+                logger.info("The server will accept registrations from:")
+                if config.use_external_referee:
+                    logger.info("  - Referee (external)")
+                else:
+                    logger.info("  - Referee (embedded)")
+                logger.info("  - Player agents")
+                logger.info("")
+                logger.info("Press Ctrl+C to stop")
+                logger.info("")
+                
+                # Wait forever (until Ctrl+C)
+                await server_task
+                return 0
+            
+            # Agent names and strategies
             agent_names = ["Alpha", "Beta", "Gamma", "Delta", "Epsilon", "Zeta", "Eta", "Theta"]
+            # Rotate through different strategies to make games interesting
+            strategies = ["random", "always_even", "always_odd", "alternating", "adaptive", "deterministic", "biased_random_70", "counter"]
             
             # Start agents
             logger.info("")
@@ -135,8 +224,9 @@ async def run_league(config: LeagueConfig) -> int:
             for i in range(config.num_agents):
                 port = config.base_agent_port + i
                 name = agent_names[i] if i < len(agent_names) else f"Agent{i+1}"
+                strategy = strategies[i % len(strategies)]  # Rotate through strategies
                 
-                agent = AgentProcess(port, name, league_url)
+                agent = AgentProcess(port, name, league_url, strategy)
                 if await agent.start(client):
                     agents.append(agent)
                 else:
@@ -211,11 +301,19 @@ def main() -> int:
     # Setup logging
     setup_logging(config.log_level)
     
+    # Add filter to suppress CancelledError on shutdown
+    error_filter = SuppressCancelledErrorFilter()
+    logging.getLogger("uvicorn.error").addFilter(error_filter)
+    logging.getLogger("uvicorn").addFilter(error_filter)
+    
     # Log configuration
     logger.info("League Configuration:")
     logger.info(f"  Manager Port: {config.port}")
-    logger.info(f"  Number of Agents: {config.num_agents}")
-    logger.info(f"  Base Agent Port: {config.base_agent_port}")
+    logger.info(f"  Mode: {'Server-Only' if config.server_only else 'Full League'}")
+    logger.info(f"  Referee: {'External' if config.use_external_referee else 'Embedded'}")
+    if not config.server_only:
+        logger.info(f"  Number of Agents: {config.num_agents}")
+        logger.info(f"  Base Agent Port: {config.base_agent_port}")
     logger.info(f"  Rounds per Matchup: {config.rounds}")
     logger.info(f"  Log Level: {config.log_level}")
     

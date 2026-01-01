@@ -1,147 +1,64 @@
 # Even-Odd League: Multi-Agent Competition System
 
-A complete multi-agent system where autonomous agents play parity games. All communication uses JSON-RPC 2.0 over HTTP.
+A distributed multi-agent system where autonomous agents compete in parity games. All communication uses JSON-RPC 2.0 over HTTP.
+
+---
 
 ## Quick Start
 
-### Option 1: Run the Complete League (Easiest)
+### Option 1: Complete System (External Referee) - **Recommended** ⭐
 
 Run the entire system with one command:
 
 ```bash
-python3 scripts/run_league.py
+python3 scripts/run_full_league.py
 ```
 
 This automatically:
 - Starts the League Manager on port 9000
-- Spawns 4 player agents (ports 8101-8104)
-- Runs a full competition with matches
+- Starts an External Referee on port 8001
+- Spawns 4 player agents (ports 8101-8104) with different strategies
+- Runs a complete tournament
 - Displays final standings
 
 **Custom options:**
 ```bash
-python3 scripts/run_league.py --num-agents 6    # Run with 6 agents
-python3 scripts/run_league.py --rounds 5        # 5 rounds per matchup
-python3 scripts/run_league.py --log-level DEBUG # Verbose logging
+python3 scripts/run_full_league.py --num-agents 6    # Run with 6 agents
+python3 scripts/run_full_league.py --rounds 5        # 5 rounds per matchup
+python3 scripts/run_full_league.py --log-level DEBUG # Verbose logging
 ```
 
-### Option 2: Run Components Separately
+### Option 2: Manual Control
 
 **Step 1: Start the League Manager**
 ```bash
-python3 scripts/start_league_manager.py
+PYTHONPATH=src python3 -m agents.league_manager --port 8000 --server-only --use-external-referee
 ```
 
-The League Manager runs on `http://127.0.0.1:9000` and handles:
-- Agent registration
-- Match scheduling
-- Running matches (referee functionality)
-- Maintaining standings
-
-**Verify it's running:**
+**Step 2: Start the Referee**
 ```bash
-curl http://127.0.0.1:9000/health
+PYTHONPATH=src python3 -m agents.referee --port 8001 --league-manager http://127.0.0.1:8000
 ```
 
-**Step 2: Start Your Player Agents** (in separate terminals)
+**Step 3: Start Player Agents** (in separate terminals)
 ```bash
-# Terminal 1
-python3 scripts/start_player.py --port 8001 --display-name "Alpha" --league-url http://127.0.0.1:9000
-
-# Terminal 2
-python3 scripts/start_player.py --port 8002 --display-name "Beta" --league-url http://127.0.0.1:9000
-
-# Terminal 3
-python3 scripts/start_player.py --port 8003 --display-name "Gamma" --league-url http://127.0.0.1:9000
-
-# Terminal 4
-python3 scripts/start_player.py --port 8004 --display-name "Delta" --league-url http://127.0.0.1:9000
+PYTHONPATH=src python3 -m agents.player --port 8101 --display-name "Alpha" --league-url http://127.0.0.1:8000 --strategy random
+PYTHONPATH=src python3 -m agents.player --port 8102 --display-name "Beta" --league-url http://127.0.0.1:8000 --strategy adaptive
+PYTHONPATH=src python3 -m agents.player --port 8103 --display-name "Gamma" --league-url http://127.0.0.1:8000 --strategy counter
+PYTHONPATH=src python3 -m agents.player --port 8104 --display-name "Delta" --league-url http://127.0.0.1:8000 --strategy always_even
 ```
 
-**Check registered agents:**
+**Step 4: Start the tournament**
 ```bash
-curl http://127.0.0.1:9000/agents
+curl -X POST http://127.0.0.1:8000/start
 ```
 
-### Option 3: Test a Single Player Agent
-
-**Start one agent:**
+**Monitor progress:**
 ```bash
-python3 scripts/start_player.py \
-  --port 8001 \
-  --display-name "Agent1" \
-  --league-url http://127.0.0.1:9000
+curl http://127.0.0.1:8000/standings
 ```
 
-**Test it manually:**
-```bash
-# Health check
-curl http://127.0.0.1:8001/health
-
-# Send game invitation
-curl -X POST http://127.0.0.1:8001/mcp \
-  -H "Content-Type: application/json" \
-  -d '{
-    "jsonrpc": "2.0",
-    "id": 1,
-    "method": "handle_game_invitation",
-    "params": {"game_id": "g1", "from_player": "test"}
-  }'
-```
-
-**Run automated verification:**
-```bash
-python3 tests/manual/test_player_manual.py
-```
-
-## Project Structure
-
-```
-.
-├── docs/                      # Documentation
-│   ├── RUNNING_AGENTS.md     # How to run agents
-│   ├── MANUAL_TESTING_GUIDE.md
-│   └── PROJECT_STRUCTURE.md
-│
-├── scripts/                   # Convenience scripts
-│   ├── start_player.py       # Start a player agent
-│   ├── start_league_manager.py
-│   └── run_league.py
-│
-├── src/                       # Source code
-│   ├── agents/
-│   │   ├── player/           # Player agent (fully implemented)
-│   │   ├── league_manager/   # League orchestrator
-│   │   └── referee/          # Match runner
-│   └── shared/               # Shared utilities
-│       └── jsonrpc.py        # JSON-RPC 2.0 protocol
-│
-└── tests/                     # Tests
-    ├── manual/
-    │   └── test_player_manual.py
-    └── test_*.py              # Unit tests
-```
-
-## Documentation
-
-- **[docs/RUNNING_AGENTS.md](docs/RUNNING_AGENTS.md)** - Quick start guide
-- **[docs/MANUAL_TESTING_GUIDE.md](docs/MANUAL_TESTING_GUIDE.md)** - Detailed examples with curl
-- **[docs/PROJECT_STRUCTURE.md](docs/PROJECT_STRUCTURE.md)** - Architecture overview
-
-## Features
-
-✅ **Player Agent** - Fully operational
-- JSON-RPC 2.0 endpoint at `POST /mcp`
-- Health check at `GET /health`
-- Required methods: `handle_game_invitation`, `parity_choose`, `notify_match_result`
-- Background registration with exponential backoff
-- Thread-safe state management
-
-✅ **Protocol Compliance**
-- Strict JSON-RPC 2.0 specification
-- All standard error codes (-32700 through -32603)
-- Method aliasing support
-- Extra fields accepted and stored
+---
 
 ## Requirements
 
@@ -152,64 +69,166 @@ python3 tests/manual/test_player_manual.py
 pip install fastapi uvicorn httpx requests
 ```
 
-## System Components
+---
 
-### League Manager
-The League Manager is the central orchestrator that:
-- Accepts agent registrations via JSON-RPC
-- Creates match schedules (round-robin)
-- Runs matches (acts as referee)
-- Maintains standings and persists league data
-- Provides REST API for status: `/health`, `/agents`, `/standings`
+## System Architecture
 
-**Default port:** 9000
-
-### Player Agents
-Player agents are autonomous bots that:
-- Register with the League Manager on startup
-- Respond to game invitations
-- Make parity choices (even/odd)
-- Receive match results and update statistics
-- Expose JSON-RPC 2.0 endpoints at `POST /mcp`
-
-**Default ports:** 8001-8104
-
-### Referee
-The referee functionality is **integrated into the League Manager**, not a separate service.
-
-## Player Agent Options
-
-```bash
-python3 scripts/start_player.py \
-  --port <PORT> \
-  --display-name <NAME> \
-  --league-url <URL> \
-  --log-level <LEVEL>
+```
+┌─────────────────┐
+│ League Manager  │  :9000 (Orchestration, REST API, Standings)
+└────────┬────────┘
+         │ JSON-RPC 2.0
+    ┌────▼─────┐
+    │ Referee  │  :8001 (Match execution)
+    └────┬─────┘
+         │ JSON-RPC 2.0
+    ┌────┴──────┬──────────┬──────────┐
+    │           │          │          │
+┌───▼───┐  ┌───▼───┐  ┌───▼───┐  ┌───▼───┐
+│Player │  │Player │  │Player │  │Player │
+│ 8101  │  │ 8102  │  │ 8103  │  │ 8104  │
+└───────┘  └───────┘  └───────┘  └───────┘
 ```
 
-- `--port`: Server port (default: 8001)
-- `--display-name`: Agent name (required)
-- `--league-url`: League Manager URL (required)
-- `--log-level`: DEBUG, INFO, WARNING, ERROR (default: INFO)
+### Components
+
+**League Manager**
+- Central orchestrator
+- Manages agent registration
+- Schedules round-robin matches
+- Tracks standings and statistics
+- REST API endpoints: `/health`, `/agents`, `/standings`, `/start`
+
+**Referee**
+- Runs individual matches
+- Sends game invitations to players
+- Collects parity choices
+- Determines winners based on dice roll
+- Notifies players of results
+
+**Player Agents**
+- Autonomous bots with different AI strategies
+- Respond to game invitations
+- Make parity choices (even/odd)
+- Track statistics and match history
+
+---
+
+## Features
+
+✅ **Distributed Architecture** - Each component runs independently  
+✅ **JSON-RPC 2.0 Protocol** - Standard, language-agnostic communication  
+✅ **9 AI Strategies** - random, adaptive, counter, always_even, always_odd, and more  
+✅ **Real-time Match Output** - See each agent's decision and outcome  
+✅ **Thread-safe State Management** - Concurrent request handling  
+✅ **Automatic Registration** - Background retry with exponential backoff  
+✅ **REST API** - Monitor league status and standings  
+✅ **Comprehensive Testing** - Unit, integration, and end-to-end tests  
+
+---
+
+## Available Strategies
+
+| Strategy | Description |
+|----------|-------------|
+| `random` | 50/50 random choice (default) |
+| `always_even` | Always chooses even |
+| `always_odd` | Always chooses odd |
+| `alternating` | Switches between even/odd each game |
+| `adaptive` | Learns from wins/losses |
+| `counter` | Tracks opponent patterns |
+| `deterministic` | Hash-based, reproducible |
+| `biased_random_70` | 70% even, 30% odd |
+| `biased_random_30` | 30% even, 70% odd |
+
+See [docs/STRATEGIES.md](docs/STRATEGIES.md) for detailed information.
+
+---
+
+## Documentation
+
+### Getting Started
+- **[QUICKSTART.md](QUICKSTART.md)** - Complete beginner guide with examples
+- **[docs/START_TOURNAMENT.md](docs/START_TOURNAMENT.md)** - How to start tournaments
+- **[docs/RUNNING_MODES.md](docs/RUNNING_MODES.md)** - Comparison of running modes
+- **[QUICK_REFERENCE.md](QUICK_REFERENCE.md)** - Command quick reference
+
+### Reference
+- **[docs/API_REFERENCE.md](docs/API_REFERENCE.md)** - Complete API documentation
+- **[docs/UNDERSTANDING_MATCH_OUTPUT.md](docs/UNDERSTANDING_MATCH_OUTPUT.md)** - Reading match decisions
+- **[docs/STRATEGIES.md](docs/STRATEGIES.md)** - AI strategy details
+- **[docs/PROJECT_STRUCTURE.md](docs/PROJECT_STRUCTURE.md)** - Architecture overview
+
+### Running Components
+- **[docs/RUNNING_LEAGUE_MANAGER.md](docs/RUNNING_LEAGUE_MANAGER.md)** - League Manager guide
+- **[docs/RUNNING_REFEREE.md](docs/RUNNING_REFEREE.md)** - Referee guide
+- **[docs/RUNNING_AGENTS.md](docs/RUNNING_AGENTS.md)** - Player agent guide
+
+### Troubleshooting
+- **[docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)** - Common issues and solutions
+- **[docs/MANUAL_TESTING_GUIDE.md](docs/MANUAL_TESTING_GUIDE.md)** - Testing with curl
+
+---
+
+## Project Structure
+
+```
+.
+├── src/
+│   ├── agents/
+│   │   ├── player/           # Player agent implementation
+│   │   ├── league_manager/   # Central orchestrator
+│   │   └── referee/          # Match runner
+│   └── shared/               # Shared utilities (JSON-RPC, HTTP, logging)
+│
+├── scripts/                   # Convenience scripts
+│   ├── run_full_league.py    # Complete system runner
+│   ├── run_league.py         # Simplified system (embedded referee)
+│   ├── start_player.py       # Start individual player
+│   ├── start_referee.py      # Start referee
+│   └── cleanup.sh            # Clean up processes
+│
+├── tests/                     # Test suite
+│   ├── test_*.py             # Unit and integration tests
+│   └── manual/               # Manual testing scripts
+│
+├── docs/                      # Documentation
+└── SHARED/                    # Runtime data (config, logs, league data)
+```
+
+---
+
+## Common Commands
+
+```bash
+# Run complete league (easiest)
+python3 scripts/run_full_league.py
+
+# Run with more agents
+python3 scripts/run_full_league.py --num-agents 6
+
+# Check status
+curl http://127.0.0.1:9000/health
+curl http://127.0.0.1:9000/agents
+curl http://127.0.0.1:9000/standings
+
+# Start tournament (manual mode)
+curl -X POST http://127.0.0.1:9000/start
+
+# Clean up processes
+bash scripts/cleanup.sh
+
+# Run tests
+pytest tests/
+```
+
+---
 
 ## Troubleshooting
 
 ### Port Already in Use
 ```bash
-# Find process using the port
-lsof -i :8001
-
-# Kill it
-kill -9 <PID>
-```
-
-### League Manager Won't Start
-```bash
-# Try using Python module syntax
-python3 -m agents.league_manager
-
-# Or use the all-in-one script
-python3 scripts/run_league.py
+bash scripts/cleanup.sh
 ```
 
 ### Agents Not Registering
@@ -217,6 +236,39 @@ python3 scripts/run_league.py
 - Check the `--league-url` matches the League Manager's address
 - Verify connectivity: `curl http://127.0.0.1:9000/health`
 - Enable debug logging: `--log-level DEBUG`
+
+### Import Errors
+Make sure you're in the project root directory and using `PYTHONPATH=src` when running modules directly.
+
+See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) for more solutions.
+
+---
+
+## Testing
+
+```bash
+# Run all tests
+pytest tests/ -v
+
+# Run specific test file
+pytest tests/test_jsonrpc.py -v
+
+# Run with coverage
+pytest tests/ --cov=src --cov-report=html
+```
+
+---
+
+## Protocol Compliance
+
+The system implements strict JSON-RPC 2.0 specification:
+- All requests/responses use proper JSON-RPC 2.0 envelopes
+- Standard error codes (-32700 through -32603)
+- Method aliasing support (`choose_parity` / `parity_choose`)
+- Extra fields accepted without rejection
+- Graceful error handling without crashes
+
+---
 
 ## License
 

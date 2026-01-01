@@ -17,6 +17,8 @@ class LeagueConfig:
     rounds: int
     log_level: str = "INFO"
     registration_path: str = "/register"
+    server_only: bool = False  # If True, don't spawn agents or auto-start league
+    use_external_referee: bool = False  # If True, use external referee via JSON-RPC
     
     @property
     def registration_endpoint(self) -> str:
@@ -74,6 +76,16 @@ Environment Variables:
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
         help="Logging level"
     )
+    parser.add_argument(
+        "--server-only",
+        action="store_true",
+        help="Run as server only (don't spawn agents or auto-start league)"
+    )
+    parser.add_argument(
+        "--use-external-referee",
+        action="store_true",
+        help="Use external referee server instead of embedded referee"
+    )
     
     args = parser.parse_args()
     
@@ -82,5 +94,7 @@ Environment Variables:
         num_agents=args.num_agents,
         base_agent_port=args.base_agent_port,
         rounds=args.rounds,
-        log_level=args.log_level
+        log_level=args.log_level,
+        server_only=args.server_only,
+        use_external_referee=args.use_external_referee
     )

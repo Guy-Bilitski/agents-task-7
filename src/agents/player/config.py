@@ -17,6 +17,7 @@ class Config:
     version: str = "1.0.0"
     log_level: str = "INFO"
     registration_path: str = "/register"
+    strategy: str = "random"  # Parity choice strategy
     
     @property
     def endpoint(self) -> str:
@@ -93,6 +94,12 @@ Environment Variables:
         default=os.getenv("REGISTRATION_PATH", "/register"),
         help="League registration endpoint path (env: REGISTRATION_PATH)"
     )
+    parser.add_argument(
+        "--strategy",
+        type=str,
+        default=os.getenv("STRATEGY", "random"),
+        help="Parity choice strategy (env: STRATEGY). Available: random, always_even, always_odd, deterministic, alternating, adaptive, counter, biased_random_70, biased_random_30"
+    )
     
     args = parser.parse_args()
     
@@ -102,5 +109,6 @@ Environment Variables:
         league_url=args.league_url,
         version=args.version,
         log_level=args.log_level,
-        registration_path=args.registration_path
+        registration_path=args.registration_path,
+        strategy=args.strategy
     )

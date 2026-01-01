@@ -6,13 +6,17 @@ Maintains in-memory state for:
 - Match results
 - Statistics
 - Event history
+- Parity strategy
 """
 import hashlib
 import logging
 import threading
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from agents.player.strategy import ParityStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -73,13 +77,15 @@ class AgentState:
     Stores all game-related state and provides thread-safe access.
     """
     
-    def __init__(self, display_name: str):
+    def __init__(self, display_name: str, strategy: Optional['ParityStrategy'] = None):
         """Initialize agent state.
         
         Args:
             display_name: Agent's display name (for determining wins)
+            strategy: Parity choice strategy (optional)
         """
         self.display_name = display_name
+        self.strategy = strategy
         self._lock = threading.Lock()
         
         # Current state
@@ -93,7 +99,8 @@ class AgentState:
         # Event history (for debugging and learning)
         self.history: list[dict] = []
         
-        logger.info(f"Agent state initialized for '{display_name}'")
+        strategy_name = strategy.get_name() if strategy else "none"
+        logger.info(f"Agent state initialized for '{display_name}' with strategy '{strategy_name}'")
     
     def record_invitation(
         self,
@@ -224,13 +231,16 @@ class AgentState:
                 self.stats.losses += 1
                 outcome = "loss"
             
-            # Add to history
+            # Add to history with outcome info
+            choice_made = self.choices.get(key)
             self.history.append({
                 "type": "result",
                 "timestamp": result.timestamp,
                 "game_id": game_id,
                 "winner": winner,
                 "outcome": outcome,
+                "won": (outcome == "win"),
+                "choice": choice_made.choice if choice_made else None,
                 "details": details
             })
             
@@ -263,6 +273,34 @@ class AgentState:
         """
         with self._lock:
             return list(self.history)
+    
+    def make_parity_choice(self, game_id: Optional[str]) -> str:
+        """Make a parity choice using the configured strategy.
+        
+        Args:
+            game_id: Game ID
+            
+        Returns:
+            "even" or "odd"
+        """
+        with self._lock:
+            if self.strategy:
+                # Use configured strategy
+                # Get game history (only completed games with results)
+                game_history = [h for h in self.history if h.get("type") == "result"]
+                stats_dict = {
+                    "games_played": self.stats.games_played,
+                    "wins": self.stats.wins,
+                    "losses": self.stats.losses,
+                    "draws": self.stats.draws,
+                    "win_rate": self.stats.win_rate
+                }
+                choice = self.strategy.choose(game_id or "", game_history, stats_dict)
+            else:
+                # Fallback to deterministic
+                choice = deterministic_parity_choice(game_id)
+            
+            return choice
 
 
 def deterministic_parity_choice(game_id: Optional[str]) -> str:
@@ -292,17 +330,18 @@ def deterministic_parity_choice(game_id: Optional[str]) -> str:
 _global_state: Optional[AgentState] = None
 
 
-def init_state(display_name: str) -> AgentState:
+def init_state(display_name: str, strategy: Optional['ParityStrategy'] = None) -> AgentState:
     """Initialize global state.
     
     Args:
         display_name: Agent's display name
+        strategy: Parity choice strategy (optional)
     
     Returns:
         AgentState instance
     """
     global _global_state
-    _global_state = AgentState(display_name)
+    _global_state = AgentState(display_name, strategy)
     return _global_state
 
 

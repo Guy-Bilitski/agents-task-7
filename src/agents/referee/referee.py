@@ -111,8 +111,12 @@ class Referee:
         dice_roll = random.randint(1, 100)
         dice_parity = "even" if dice_roll % 2 == 0 else "odd"
         
-        logger.info(f"Game {game_id}: Dice rolled {dice_roll} ({dice_parity})")
-        logger.info(f"Game {game_id}: {player1.display_name} chose {choice1}, {player2.display_name} chose {choice2}")
+        # Log decisions prominently
+        logger.info(f"")
+        logger.info(f"🎲 Game {game_id}: {player1.display_name} vs {player2.display_name}")
+        logger.info(f"   {player1.display_name} chose: {choice1}")
+        logger.info(f"   {player2.display_name} chose: {choice2}")
+        logger.info(f"   Dice rolled: {dice_roll} ({dice_parity})")
         
         # Step 4: Determine winner
         # Player wins if their choice matches the dice parity
@@ -121,13 +125,16 @@ class Referee:
         
         if p1_correct and not p2_correct:
             winner = player1.display_name
+            logger.info(f"   ✓ Winner: {winner} (correct prediction)")
         elif p2_correct and not p1_correct:
             winner = player2.display_name
+            logger.info(f"   ✓ Winner: {winner} (correct prediction)")
         else:
             # Both correct or both wrong = draw (we'll give it to neither)
             winner = None
-        
-        logger.info(f"Game {game_id}: Winner is {winner or 'DRAW'}")
+            result_reason = "both correct" if p1_correct and p2_correct else "both wrong"
+            logger.info(f"   ⚖️  Result: DRAW ({result_reason})")
+        logger.info(f"")
         
         result = GameResult(
             game_id=game_id,

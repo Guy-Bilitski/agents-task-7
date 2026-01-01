@@ -11,6 +11,7 @@ import json
 import logging
 import signal
 import sys
+import uuid
 from dataclasses import dataclass, field
 from itertools import combinations
 from typing import Optional
@@ -18,8 +19,9 @@ from typing import Optional
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 import uvicorn
+import httpx
 
-from src.agents.referee.referee import Agent, Referee, GameResult
+from agents.referee.referee import Agent, Referee, GameResult
 
 logger = logging.getLogger(__name__)
 
@@ -59,19 +61,23 @@ class LeagueStats:
 class LeagueManager:
     """Central league manager server."""
     
-    def __init__(self, port: int, rounds: int = 3):
+    def __init__(self, port: int, rounds: int = 3, use_external_referee: bool = False):
         """Initialize league manager.
         
         Args:
             port: Port to run the server on
             rounds: Number of rounds for each matchup
+            use_external_referee: If True, use external referee via JSON-RPC; if False, use embedded referee
         """
         self.port = port
         self.rounds = rounds
         self.agents: dict[str, Agent] = {}
         self.stats = LeagueStats()
-        self.referee = Referee(timeout=5.0)
+        self.use_external_referee = use_external_referee
+        self.referee_endpoint: Optional[str] = None  # External referee endpoint
+        self.referee = Referee(timeout=5.0) if not use_external_referee else None  # Embedded referee (legacy)
         self._running = False
+        self._league_running = False
         self._server: Optional[uvicorn.Server] = None
         
         # Create FastAPI app
@@ -98,7 +104,7 @@ class LeagueManager:
         
         @app.post("/register")
         async def register(request: Request):
-            """Handle agent registration."""
+            """Handle agent registration (players and referee)."""
             try:
                 data = await request.json()
                 
@@ -115,8 +121,19 @@ class LeagueManager:
                 display_name = data["display_name"]
                 version = data["version"]
                 endpoint = data["endpoint"]
+                agent_type = data.get("agent_type", "player")  # "player" or "referee"
                 
-                # Register the agent
+                # Handle referee registration
+                if agent_type == "referee":
+                    self.referee_endpoint = endpoint
+                    logger.info(f"✓ Registered referee: {display_name} (v{version}) at {endpoint}")
+                    return {
+                        "status": "registered",
+                        "agent_type": "referee",
+                        "message": f"Referee {display_name} registered successfully"
+                    }
+                
+                # Handle player registration
                 agent = Agent(
                     display_name=display_name,
                     version=version,
@@ -190,6 +207,31 @@ class LeagueManager:
                 ]
             }
         
+        @app.post("/start")
+        async def start_league():
+            """Start the league competition with currently registered agents."""
+            if len(self.agents) < 2:
+                return JSONResponse(
+                    content={"error": "Need at least 2 agents to start league"},
+                    status_code=400
+                )
+            
+            if self._league_running:
+                return JSONResponse(
+                    content={"error": "League is already running"},
+                    status_code=409
+                )
+            
+            # Run league in background
+            asyncio.create_task(self._run_league_background())
+            
+            return {
+                "status": "started",
+                "agents": len(self.agents),
+                "rounds": self.rounds,
+                "message": f"League starting with {len(self.agents)} agents"
+            }
+        
         return app
     
     async def run_league(self, wait_for_agents: int = 0, wait_timeout: float = 30.0) -> dict:
@@ -240,7 +282,14 @@ class LeagueManager:
             logger.info(f"{'='*60}")
             
             for player1, player2 in matchups:
-                result = await self.referee.run_game(player1, player2)
+                # Run game via referee (external or embedded)
+                if self.use_external_referee:
+                    result = await self._run_game_via_external_referee(player1, player2)
+                elif self.referee is not None:
+                    result = await self.referee.run_game(player1, player2)
+                else:
+                    raise RuntimeError("No referee available (neither external nor embedded)")
+                
                 self._record_result(result)
                 self.stats.game_history.append(result)
                 
@@ -259,6 +308,98 @@ class LeagueManager:
         self._print_final_standings()
         
         return self._get_final_standings()
+    
+    async def _run_league_background(self):
+        """Run league in background (wrapper for API endpoint)."""
+        try:
+            self._league_running = True
+            logger.info("League started via API endpoint")
+            await self.run_league(wait_for_agents=0)
+        except Exception as e:
+            logger.error(f"Error running league: {e}", exc_info=True)
+        finally:
+            self._league_running = False
+            logger.info("League completed")
+    
+    async def _run_game_via_external_referee(self, player1: Agent, player2: Agent) -> GameResult:
+        """Run a game via external referee MCP server.
+        
+        Args:
+            player1: First player agent
+            player2: Second player agent
+        
+        Returns:
+            GameResult from the referee
+        
+        Raises:
+            RuntimeError: If referee is not registered or call fails
+        """
+        if not self.referee_endpoint:
+            raise RuntimeError("No referee registered")
+        
+        match_id = f"match_{uuid.uuid4().hex[:8]}"
+        
+        # Prepare JSON-RPC request
+        payload = {
+            "jsonrpc": "2.0",
+            "id": match_id,
+            "method": "run_match",
+            "params": {
+                "match_id": match_id,
+                "player1": {
+                    "display_name": player1.display_name,
+                    "version": player1.version,
+                    "endpoint": player1.endpoint
+                },
+                "player2": {
+                    "display_name": player2.display_name,
+                    "version": player2.version,
+                    "endpoint": player2.endpoint
+                }
+            }
+        }
+        
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    self.referee_endpoint,
+                    json=payload,
+                    timeout=60.0  # Long timeout for match execution
+                )
+                response.raise_for_status()
+                data = response.json()
+                
+                if "error" in data:
+                    error = data["error"]
+                    raise RuntimeError(f"Referee error: {error.get('message', 'Unknown error')}")
+                
+                result = data.get("result", {})
+                
+                # Convert result dict back to GameResult
+                return GameResult(
+                    game_id=result.get("game_id", "unknown"),
+                    player1=result.get("player1", player1.display_name),
+                    player2=result.get("player2", player2.display_name),
+                    player1_choice=result.get("player1_choice", "none"),
+                    player2_choice=result.get("player2_choice", "none"),
+                    dice_roll=result.get("dice_roll", 0),
+                    dice_parity=result.get("dice_parity", "none"),
+                    winner=result.get("winner")
+                )
+                
+        except Exception as e:
+            logger.error(f"Error calling external referee: {e}")
+            # Return a default result on error
+            return GameResult(
+                game_id=match_id,
+                player1=player1.display_name,
+                player2=player2.display_name,
+                player1_choice="error",
+                player2_choice="error",
+                dice_roll=0,
+                dice_parity="none",
+                winner=None
+            )
     
     def _record_result(self, result: GameResult):
         """Record a game result in standings."""
@@ -359,18 +500,49 @@ class LeagueManager:
     
     async def start_server(self):
         """Start the league manager server (blocks until shutdown)."""
+        # Check if port is available first by attempting to connect
+        import socket
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(0.1)
+        try:
+            # If we can connect, something is already running on this port
+            result = sock.connect_ex(("127.0.0.1", self.port))
+            if result == 0:
+                sock.close()
+                logger.error(f"Port {self.port} is already in use")
+                raise RuntimeError(f"Port {self.port} is already in use. Try a different port with --port {self.port + 1}")
+        except socket.timeout:
+            # Timeout means nothing is listening - port is available
+            pass
+        finally:
+            sock.close()
+        
+        # Suppress asyncio CancelledError logging during shutdown
+        logging.getLogger("uvicorn.error").setLevel(logging.CRITICAL)
+        
         config = uvicorn.Config(
             app=self.app,
             host="127.0.0.1",
             port=self.port,
-            log_level="warning",
+            log_level="critical",  # Suppress shutdown errors
             access_log=False
         )
         self._server = uvicorn.Server(config)
         self._running = True
         
         logger.info(f"League Manager starting on http://127.0.0.1:{self.port}")
-        await self._server.serve()
+        
+        try:
+            await self._server.serve()
+        except (asyncio.CancelledError, KeyboardInterrupt):
+            # Normal shutdown, suppress error
+            pass
+        except SystemExit:
+            # Catch uvicorn's sys.exit() and convert to exception
+            raise RuntimeError(f"Server failed to start on port {self.port}")
+        finally:
+            # Ensure we don't propagate the error
+            self._running = False
     
     async def start_server_background(self):
         """Start the server in the background (returns immediately)."""

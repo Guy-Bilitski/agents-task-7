@@ -2,14 +2,14 @@
 
 Implements the three required JSON-RPC methods:
 1. handle_game_invitation
-2. parity_choose
+2. parity_choose / choose_parity
 3. notify_match_result
 """
 import logging
 from typing import Any, Callable
 
 from shared.jsonrpc import JSONRPCError, invalid_params_error
-from agents.player.state import get_state, deterministic_parity_choice
+from agents.player.state import get_state
 
 logger = logging.getLogger(__name__)
 
@@ -96,11 +96,11 @@ def parity_choose(params: dict | list | None) -> dict:
     if extra_fields:
         logger.debug(f"Extra fields in parity_choose: {extra_fields}")
     
-    # Determine choice using deterministic strategy
-    choice = deterministic_parity_choice(game_id)
+    # Use state's strategy-based choice method
+    state = get_state()
+    choice = state.make_parity_choice(game_id)
     
     # Record in state
-    state = get_state()
     state.record_choice(game_id, choice, extra_fields)
     
     response = {
@@ -164,12 +164,26 @@ def notify_match_result(params: dict | list | None) -> dict:
     return response
 
 
+def ping(params: dict | list | None) -> dict:
+    """Handle ping request for connectivity check.
+    
+    Args:
+        params: Optional parameters (can be empty)
+    
+    Returns:
+        Pong response
+    """
+    logger.debug("Received ping request")
+    return {"status": "ok", "message": "pong"}
+
+
 # Method registry: maps method names to handler functions
 METHOD_REGISTRY: dict[str, Callable[[dict | list | None], dict]] = {
     "handle_game_invitation": handle_game_invitation,
     "parity_choose": parity_choose,
     "choose_parity": parity_choose,  # Alias for compatibility
     "notify_match_result": notify_match_result,
+    "ping": ping,  # Connectivity check
 }
 
 

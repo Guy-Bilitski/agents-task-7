@@ -14,6 +14,7 @@ from agents.player import setup_logging
 from agents.player.config import parse_args
 from agents.player.app import create_app
 from agents.player.state import init_state
+from agents.player.strategy import get_strategy, list_strategies
 
 logger = logging.getLogger(__name__)
 
@@ -36,11 +37,21 @@ def main() -> int:
     logger.info(f"MCP Endpoint: {config.endpoint}")
     logger.info(f"League URL: {config.league_url}")
     logger.info(f"Registration URL: {config.registration_url}")
+    logger.info(f"Strategy: {config.strategy}")
     logger.info(f"Log Level: {config.log_level}")
     logger.info("=" * 60)
     
-    # Initialize agent state
-    init_state(config.display_name)
+    # Load strategy
+    try:
+        strategy = get_strategy(config.strategy)
+        logger.info(f"Loaded strategy: {strategy.get_name()}")
+    except ValueError as e:
+        logger.error(f"Invalid strategy: {e}")
+        logger.error(f"Available strategies: {', '.join(list_strategies())}")
+        return 1
+    
+    # Initialize agent state with strategy
+    init_state(config.display_name, strategy)
     logger.info("Agent state initialized")
     
     # Setup graceful shutdown
