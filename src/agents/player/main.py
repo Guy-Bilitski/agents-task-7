@@ -1,7 +1,7 @@
 """Main entrypoint for MCP Agent.
 
 Usage:
-    python -m agent --port 8001 --display-name "Agent1" --league-url http://127.0.0.1:9000
+    python -m agents.player --port 8001 --display-name "Agent1" --league-url http://127.0.0.1:9000
 """
 import logging
 import signal
@@ -10,10 +10,10 @@ import asyncio
 
 import uvicorn
 
-from agent import setup_logging
-from agent.config import parse_args
-from agent.app import create_app
-from agent.state import init_state
+from agents.player import setup_logging
+from agents.player.config import parse_args
+from agents.player.app import create_app
+from agents.player.state import init_state
 
 logger = logging.getLogger(__name__)
 

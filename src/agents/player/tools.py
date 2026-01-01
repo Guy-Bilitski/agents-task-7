@@ -8,8 +8,8 @@ Implements the three required JSON-RPC methods:
 import logging
 from typing import Any, Callable
 
-from agent.jsonrpc import JSONRPCError, invalid_params_error
-from agent.state import get_state, deterministic_parity_choice
+from shared.jsonrpc import JSONRPCError, invalid_params_error
+from agents.player.state import get_state, deterministic_parity_choice
 
 logger = logging.getLogger(__name__)
 
@@ -168,6 +168,7 @@ def notify_match_result(params: dict | list | None) -> dict:
 METHOD_REGISTRY: dict[str, Callable[[dict | list | None], dict]] = {
     "handle_game_invitation": handle_game_invitation,
     "parity_choose": parity_choose,
+    "choose_parity": parity_choose,  # Alias for compatibility
     "notify_match_result": notify_match_result,
 }
 

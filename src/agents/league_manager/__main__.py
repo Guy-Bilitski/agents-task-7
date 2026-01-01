@@ -15,9 +15,9 @@ from typing import List, Optional
 
 import httpx
 
-from league import setup_logging
-from league.config import parse_league_args, LeagueConfig
-from league.manager import LeagueManager
+from agents.league_manager import setup_logging
+from agents.league_manager.config import parse_league_args, LeagueConfig
+from agents.league_manager.manager import LeagueManager
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +43,7 @@ class AgentProcess:
             
             self.process = subprocess.Popen(
                 [
-                    python_exe, "-m", "agent",
+                    python_exe, "-m", "agents.player",
                     "--port", str(self.port),
                     "--display-name", self.name,
                     "--league-url", self.league_url,
@@ -51,7 +51,7 @@ class AgentProcess:
                 ],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                env={**os.environ, "PYTHONPATH": os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "src")}
             )
             
             # Wait for health check (async)

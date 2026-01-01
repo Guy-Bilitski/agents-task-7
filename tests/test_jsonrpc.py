@@ -1,7 +1,7 @@
 """Unit tests for JSON-RPC 2.0 protocol implementation."""
 import json
 import pytest
-from agent.jsonrpc import (
+from shared.jsonrpc import (
     parse_request,
     create_success_response,
     create_error_response,

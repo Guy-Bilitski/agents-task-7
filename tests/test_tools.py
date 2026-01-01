@@ -1,8 +1,8 @@
 """Unit tests for tool handlers."""
 import pytest
-from agent.tools import handle_game_invitation, parity_choose, notify_match_result
-from agent.jsonrpc import JSONRPCError
-from agent.state import init_state, get_state
+from agents.player.tools import handle_game_invitation, parity_choose, notify_match_result
+from shared.jsonrpc import JSONRPCError
+from agents.player.state import init_state, get_state
 
 
 @pytest.fixture(autouse=True)

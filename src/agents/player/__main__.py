@@ -1,5 +1,5 @@
-"""Allow running as python -m agent."""
-from agent.main import main
+"""Allow running as python -m agents.player."""
+from agents.player.main import main
 import sys
 
 if __name__ == "__main__":

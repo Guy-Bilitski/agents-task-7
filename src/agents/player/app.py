@@ -11,7 +11,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse
 
-from agent.jsonrpc import (
+from shared.jsonrpc import (
     parse_request,
     create_success_response,
     create_error_response,
@@ -20,7 +20,7 @@ from agent.jsonrpc import (
     JSONRPCError,
     JSONRPCRequest,
 )
-from agent.registration import init_registration, stop_registration
+from agents.player.registration import init_registration, stop_registration
 
 logger = logging.getLogger(__name__)
 
@@ -114,7 +114,7 @@ def create_app(config: Optional[Any] = None) -> FastAPI:
                 logger.info(f"Notification received (no response): method={method}")
                 # Still process the method, just don't respond
                 try:
-                    from agent.tools import dispatch_method
+                    from agents.player.tools import dispatch_method
                     dispatch_method(method, params)
                 except Exception as e:
                     logger.error(f"Error processing notification: {e}", exc_info=True)
@@ -122,7 +122,7 @@ def create_app(config: Optional[Any] = None) -> FastAPI:
             
             # Dispatch to method handler
             try:
-                from agent.tools import dispatch_method
+                from agents.player.tools import dispatch_method
                 result = dispatch_method(method, params)
                 response = create_success_response(request_id, result)
                 logger.info(f"Method '{method}' succeeded")

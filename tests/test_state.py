@@ -2,7 +2,7 @@
 import pytest
 import threading
 import time
-from agent.state import (
+from agents.player.state import (
     init_state,
     get_state,
     AgentState,
