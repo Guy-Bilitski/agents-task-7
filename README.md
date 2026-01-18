@@ -1,5 +1,10 @@
 # Even-Odd League: Multi-Agent Competition System
 
+[![CI Pipeline](https://github.com/YOUR_USERNAME/agents-task7/actions/workflows/ci.yml/badge.svg)](https://github.com/YOUR_USERNAME/agents-task7/actions/workflows/ci.yml)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 A distributed multi-agent system where autonomous agents compete in parity games. All communication uses JSON-RPC 2.0 over HTTP.
 
 ---
@@ -116,14 +121,18 @@ pip install fastapi uvicorn httpx requests
 
 ## Features
 
-✅ **Distributed Architecture** - Each component runs independently  
-✅ **JSON-RPC 2.0 Protocol** - Standard, language-agnostic communication  
-✅ **9 AI Strategies** - random, adaptive, counter, always_even, always_odd, and more  
-✅ **Real-time Match Output** - See each agent's decision and outcome  
-✅ **Thread-safe State Management** - Concurrent request handling  
-✅ **Automatic Registration** - Background retry with exponential backoff  
-✅ **REST API** - Monitor league status and standings  
-✅ **Comprehensive Testing** - Unit, integration, and end-to-end tests  
+✅ **Distributed Architecture** - Each component runs independently
+✅ **JSON-RPC 2.0 Protocol** - Standard, language-agnostic communication
+✅ **9+ AI Strategies** - random, adaptive, counter, always_even, always_odd, and more
+✅ **Plugin Architecture** - Extensible strategy system for custom implementations
+✅ **Real-time Match Output** - See each agent's decision and outcome
+✅ **Thread-safe State Management** - Concurrent request handling
+✅ **Automatic Registration** - Background retry with exponential backoff
+✅ **REST API** - Monitor league status and standings
+✅ **Comprehensive Testing** - Unit, integration, and end-to-end tests
+✅ **CI/CD Pipeline** - Automated testing, linting, and security scanning
+✅ **Pre-commit Hooks** - Automated code quality checks
+✅ **Professional Documentation** - PRD, ADD, and budget tracking  
 
 ---
 
@@ -147,6 +156,11 @@ See [docs/STRATEGIES.md](docs/STRATEGIES.md) for detailed information.
 
 ## Documentation
 
+### Project Planning & Design
+- **[docs/PRODUCT_REQUIREMENTS.md](docs/PRODUCT_REQUIREMENTS.md)** - Product Requirements Document (PRD)
+- **[docs/ARCHITECTURE_DESIGN.md](docs/ARCHITECTURE_DESIGN.md)** - Architecture Design Document (ADD)
+- **[docs/BUDGET_TRACKING.md](docs/BUDGET_TRACKING.md)** - Budget and resource tracking
+
 ### Getting Started
 - **[QUICKSTART.md](QUICKSTART.md)** - Complete beginner guide with examples
 - **[docs/START_TOURNAMENT.md](docs/START_TOURNAMENT.md)** - How to start tournaments
@@ -159,12 +173,17 @@ See [docs/STRATEGIES.md](docs/STRATEGIES.md) for detailed information.
 - **[docs/STRATEGIES.md](docs/STRATEGIES.md)** - AI strategy details
 - **[docs/PROJECT_STRUCTURE.md](docs/PROJECT_STRUCTURE.md)** - Architecture overview
 
+### Extensibility
+- **[docs/PLUGIN_DEVELOPMENT.md](docs/PLUGIN_DEVELOPMENT.md)** - Creating custom strategy plugins
+- **[docs/STRATEGY_IMPLEMENTATION.md](docs/STRATEGY_IMPLEMENTATION.md)** - How to add new strategies
+
 ### Running Components
 - **[docs/RUNNING_LEAGUE_MANAGER.md](docs/RUNNING_LEAGUE_MANAGER.md)** - League Manager guide
 - **[docs/RUNNING_REFEREE.md](docs/RUNNING_REFEREE.md)** - Referee guide
 - **[docs/RUNNING_AGENTS.md](docs/RUNNING_AGENTS.md)** - Player agent guide
 
-### Troubleshooting
+### Development & Contributing
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** - Contribution guidelines
 - **[docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)** - Common issues and solutions
 - **[docs/MANUAL_TESTING_GUIDE.md](docs/MANUAL_TESTING_GUIDE.md)** - Testing with curl
 
@@ -174,9 +193,14 @@ See [docs/STRATEGIES.md](docs/STRATEGIES.md) for detailed information.
 
 ```
 .
+├── .github/
+│   └── workflows/
+│       └── ci.yml            # CI/CD pipeline configuration
+│
 ├── src/
 │   ├── agents/
 │   │   ├── player/           # Player agent implementation
+│   │   │   └── plugins/      # Strategy plugins directory
 │   │   ├── league_manager/   # Central orchestrator
 │   │   └── referee/          # Match runner
 │   └── shared/               # Shared utilities (JSON-RPC, HTTP, logging)
@@ -193,6 +217,13 @@ See [docs/STRATEGIES.md](docs/STRATEGIES.md) for detailed information.
 │   └── manual/               # Manual testing scripts
 │
 ├── docs/                      # Documentation
+│   ├── PRODUCT_REQUIREMENTS.md
+│   ├── ARCHITECTURE_DESIGN.md
+│   ├── BUDGET_TRACKING.md
+│   └── ...                   # Additional documentation
+│
+├── .pre-commit-config.yaml   # Pre-commit hooks configuration
+├── pyproject.toml            # Project config with linting tools
 └── SHARED/                    # Runtime data (config, logs, league data)
 ```
 
@@ -244,6 +275,52 @@ See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) for more solutions.
 
 ---
 
+## Development Setup
+
+### Install Development Dependencies
+
+```bash
+pip install -e ".[dev]"
+```
+
+### Pre-commit Hooks
+
+Install and run pre-commit hooks for automated code quality:
+
+```bash
+# Install hooks
+pip install pre-commit
+pre-commit install
+
+# Run on all files
+pre-commit run --all-files
+```
+
+### Code Quality Tools
+
+The project uses several code quality tools configured in `pyproject.toml`:
+
+| Tool | Purpose | Command |
+|------|---------|---------|
+| **black** | Code formatting | `black src/ tests/` |
+| **isort** | Import sorting | `isort src/ tests/` |
+| **flake8** | Linting | `flake8 src/` |
+| **pylint** | Advanced linting | `pylint src/` |
+| **mypy** | Type checking | `mypy src/` |
+| **bandit** | Security scanning | `bandit -r src/` |
+
+### CI/CD Pipeline
+
+The GitHub Actions pipeline (`.github/workflows/ci.yml`) automatically runs:
+- Code formatting checks (black, isort)
+- Linting (flake8, pylint)
+- Type checking (mypy)
+- Tests on Python 3.10, 3.11, 3.12
+- Security scanning (bandit, safety)
+- Package build verification
+
+---
+
 ## Testing
 
 ```bash
@@ -255,6 +332,12 @@ pytest tests/test_jsonrpc.py -v
 
 # Run with coverage
 pytest tests/ --cov=src --cov-report=html
+
+# Run only unit tests
+pytest tests/ -v -m unit
+
+# Run only integration tests
+pytest tests/ -v -m integration
 ```
 
 ---
